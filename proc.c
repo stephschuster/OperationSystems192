@@ -235,7 +235,7 @@ fork(void)
 // An exited process remains in the zombie state
 // until its parent calls wait() to find out it exited.
 void
-exit(void)
+exit(int status)
 {
   struct proc *curproc = myproc();
   struct proc *p;
@@ -270,6 +270,9 @@ exit(void)
         wakeup1(initproc);
     }
   }
+
+  // save the status
+  curproc->status = status;
 
   // Jump into the scheduler, never to return.
   curproc->state = ZOMBIE;
