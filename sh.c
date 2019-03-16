@@ -3,6 +3,10 @@
 #include "types.h"
 #include "user.h"
 #include "fcntl.h"
+#include "stat.h"
+
+// path file
+#define PATH "/path"
 
 // Parsed command representation
 #define EXEC  1
@@ -52,6 +56,8 @@ struct backcmd {
 int fork1(void);  // Fork but panics on failure.
 void panic(char*);
 struct cmd *parsecmd(char*);
+int isFileExists(const char *path);
+int getFileLength(char* path);
 
 // Execute cmd.  Never returns.
 void
@@ -75,7 +81,34 @@ runcmd(struct cmd *cmd)
     ecmd = (struct execcmd*)cmd;
     if(ecmd->argv[0] == 0)
       exit();
-    exec(ecmd->argv[0], ecmd->argv);
+
+    if (isFileExists(ecmd->argv[0])) {
+        exec(ecmd->argv[0], ecmd->argv);
+    } else {
+        int bufferLength = getFileLength(PATH);
+        int fd = open(PATH, O_RDONLY);
+        char *buffer = malloc(bufferLength);
+        read(fd, buffer, bufferLength);
+        close(fd);
+
+        char *start = buffer;
+        char *end, *path;
+        int cmdLength = strlen(ecmd->argv[0]);
+        while ((end = strchr(start, ':')) != 0) {
+            int pathLength = end - start;
+            path = malloc(cmdLength + pathLength);
+            for (int i = 0; start[i] != ':'; i++) {
+                path[i] = start[i];
+            }
+            for (int i = 0; i < cmdLength; i++) {
+                path[i + pathLength] = ecmd->argv[0][i];
+            }
+            if (isFileExists(path)) {
+                exec(path, ecmd->argv);
+            }
+            start = end + 1;
+        }
+    }
     printf(2, "exec %s failed\n", ecmd->argv[0]);
     break;
 
@@ -490,4 +523,28 @@ nulterminate(struct cmd *cmd)
     break;
   }
   return cmd;
+}
+
+int isFileExists(const char *filename) {
+    struct stat buffer;
+    int exist = stat(filename, &buffer);
+    if(exist != -1) {
+        return 1;
+    }
+    else { // -1
+        return 0;
+    }
+}
+
+int getFileLength(char* path) {
+    int fd = open(path, O_RDONLY), length = 0;
+    char c;
+    if (fd < 0) {
+        return -1;
+    }
+    while(read(fd, &c, 1) == 1) {
+        length++;
+    }
+    close(fd);
+    return length;
 }
