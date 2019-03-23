@@ -16,14 +16,22 @@ sys_fork(void)
 int
 sys_exit(int status)
 {
-  exit(status);
+  int exit_status;
+
+  if(argint(0, &exit_status) < 0)
+    return -1;
+
+  exit(exit_status);
   return 0;  // not reached
 }
 
 int
 sys_wait(void)
 {
-  return wait();
+  char *status;
+  if(argptr(0, &status, 4) < 0)
+    return -1;
+  return wait((int*)status);
 }
 
 int
@@ -88,4 +96,14 @@ sys_uptime(void)
   xticks = ticks;
   release(&tickslock);
   return xticks;
+}
+
+int
+sys_detach(void)
+{
+  int pid;
+
+  if(argint(0, &pid) < 0)
+    return -1;
+  return detach(pid);
 }
