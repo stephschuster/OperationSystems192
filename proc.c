@@ -301,7 +301,7 @@ wait(int *status)
         // Found one.
         if( status!=null)
             *status = p->status;
-        curproc->status = status;
+        curproc->status = null;
         pid = p->pid;
         kfree(p->kstack);
         p->kstack = 0;
