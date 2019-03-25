@@ -109,7 +109,7 @@ sys_detach(void)
 }
 
 void
-sys_priority(int)
+sys_priority(void)
 {
   int prior;
   argint(0,&prior);
@@ -119,7 +119,7 @@ sys_priority(int)
 }
 
 void
-sys_policy(int)
+sys_policy(void)
 {
   int poli;
   argint(0,&poli);
