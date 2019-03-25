@@ -231,7 +231,7 @@ fork(void)
   acquire(&ptable.lock);
 
   np->state = RUNNABLE;
-  PolicyCheck(p);
+  PolicyCheck(np);
 
   release(&ptable.lock);
 
@@ -619,8 +619,7 @@ priority(int newPriority)
   acquire(&ptable.lock);
 
   struct proc *curproc = myproc();
-  curproc->proc_priority = newPriority;
+  curproc->priority_val = newPriority;
 
   release(&ptable.lock);
-}
 }

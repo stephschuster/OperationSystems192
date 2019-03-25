@@ -118,7 +118,7 @@ sys_priority(int)
   else priority(prior);
 }
 
-void 
+void
 sys_policy(int)
 {
   int poli;
