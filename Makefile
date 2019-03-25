@@ -30,7 +30,7 @@ OBJS = \
 	vm.o\
 
 # To compile and run on mac OS uncumment the following line.
-# TOOLPREFIX = i386-elf-
+TOOLPREFIX = i386-elf-
 
 # Using native tools (e.g., on X86 Linux)
 #TOOLPREFIX = 

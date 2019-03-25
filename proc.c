@@ -8,13 +8,14 @@
 #include "proc.h"
 #include "spinlock.h"
 
-extern PriorityQueue pq;
-extern RoundRobinQueue rrq;
+int policy_flag = 1;
+
+extern PriorityQueue pq;    //task3.2+3.3
+extern RoundRobinQueue rrq; //task 3.1
 extern RunningProcessesHolder rpholder;
 
 long long getAccumulator(struct proc *p) {
-	//Implement this function, remove the panic line.
-	panic("getAccumulator: not implemented\n");
+  return p->acc;
 }
 
 struct {
@@ -122,6 +123,10 @@ found:
   memset(p->context, 0, sizeof *p->context);
   p->context->eip = (uint)forkret;
 
+  p->priority_val = 5;
+
+  
+
   return p;
 }
 
@@ -159,6 +164,7 @@ userinit(void)
   acquire(&ptable.lock);
 
   p->state = RUNNABLE;
+  PolicyCheck(p);
 
   release(&ptable.lock);
 }
@@ -225,6 +231,7 @@ fork(void)
   acquire(&ptable.lock);
 
   np->state = RUNNABLE;
+  PolicyCheck(p);
 
   release(&ptable.lock);
 
@@ -301,7 +308,7 @@ wait(int *status)
         // Found one.
         if( status!=null)
             *status = p->status;
-        curproc->status = null;
+        curproc->status = *status;
         pid = p->pid;
         kfree(p->kstack);
         p->kstack = 0;
@@ -358,6 +365,7 @@ scheduler(void)
       c->proc = p;
       switchuvm(p);
       p->state = RUNNING;
+      rpholder.add(p);
 
       swtch(&(c->scheduler), p->context);
       switchkvm();
@@ -365,6 +373,10 @@ scheduler(void)
       // Process is done running for now.
       // It should have changed its p->state before coming back.
       c->proc = 0;
+
+      p->acc = p->acc + p->priority_val;
+      
+      PolicyCheck(p);
     }
     release(&ptable.lock);
 
@@ -476,8 +488,10 @@ wakeup1(void *chan)
   struct proc *p;
 
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
-    if(p->state == SLEEPING && p->chan == chan)
+    if(p->state == SLEEPING && p->chan == chan){
       p->state = RUNNABLE;
+      PolicyCheck(p);
+    }
 }
 
 // Wake up all processes sleeping on chan.
@@ -502,8 +516,10 @@ kill(int pid)
     if(p->pid == pid){
       p->killed = 1;
       // Wake process from sleep if necessary.
-      if(p->state == SLEEPING)
+      if(p->state == SLEEPING){
         p->state = RUNNABLE;
+        PolicyCheck(p);
+      }
       release(&ptable.lock);
       return 0;
     }
@@ -565,5 +581,46 @@ detach(int pid)
   }
   release(&ptable.lock);
   return -1;
+}
 
+void
+PolicyCheck(struct proc *p)
+{  
+  rpholder.remove(p);
+  
+  if(policy_flag == 1){
+    rrq.enqueue(p);
+    return;
+  }
+  long long minAcc;
+  if (pq.getMinAccumulator(&minAcc))  // return true iff the queue isnt empty
+    p->acc = minAcc;
+
+  else p->acc = 0;
+  
+  pq.put(p);
+}
+
+
+void
+policy (int policy_id)
+{
+  acquire(&ptable.lock);
+
+  policy_flag = policy_id;
+  // TODO
+
+  release(&ptable.lock); 
+}
+
+void
+priority(int newPriority)
+{
+  acquire(&ptable.lock);
+
+  struct proc *curproc = myproc();
+  curproc->proc_priority = newPriority;
+
+  release(&ptable.lock);
+}
 }

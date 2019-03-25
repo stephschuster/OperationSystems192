@@ -107,3 +107,23 @@ sys_detach(void)
     return -1;
   return detach(pid);
 }
+
+void
+sys_priority(int)
+{
+  int prior;
+  argint(0,&prior);
+  if(prior > 10 || prior < 0)
+    return;
+  else priority(prior);
+}
+
+void 
+sys_policy(int)
+{
+  int poli;
+  argint(0,&poli);
+  if(poli > 3 || poli < 1)
+    return;
+  else policy(poli);
+}

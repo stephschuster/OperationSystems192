@@ -15,4 +15,6 @@ main(int argc, char *argv[])
 
     printf(2, "Wat is life? First status [%d] second: [%d] \n", first_status, second_status);
   }
+
+  exit(0);
 }
