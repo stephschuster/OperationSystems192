@@ -123,7 +123,7 @@ void            yield(void);
 int             detach(int);
 void            policy(int);
 void            priority(int);
-void            PolicyCheckToRun(struct proc*);
+void            PolicyCheckToRun(struct proc*, boolean);
 
 // swtch.S
 void            swtch(struct context**, struct context*);

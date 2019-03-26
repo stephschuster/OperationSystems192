@@ -162,7 +162,7 @@ userinit(void)
   acquire(&ptable.lock);
 
   p->state = RUNNABLE;
-  PolicyCheckToRun(p);
+  PolicyCheckToRun(p, true);
 
   release(&ptable.lock);
 }
@@ -229,7 +229,7 @@ fork(void)
   acquire(&ptable.lock);
 
   np->state = RUNNABLE;
-  PolicyCheckToRun(np);
+  PolicyCheckToRun(np, true);
 
   release(&ptable.lock);
 
@@ -343,9 +343,11 @@ struct proc* getByTimeQuantum(void){
                 minimum = proc;
             }
         }
+
         pq.extractProc(minimum);
         return minimum;
     }
+
     return pq.extractMin();
 }
 
@@ -394,22 +396,19 @@ scheduler(void)
   struct proc *p;
   struct cpu *c = mycpu();
   c->proc = 0;
-  
+
   for(;;){
     // Enable interrupts on this processor.
     sti();
 
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
-    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
         // check if the queue is empty
         if ((policy_flag == 1 && rrq.isEmpty()) || (policy_flag != 1 && pq.isEmpty())) {
             release(&ptable.lock);
             continue;
         }
 
-        if(p->state != RUNNABLE)
-            continue;
         p = getProcessFromPolicy();
         // Switch to chosen process.  It is the process's job
         // to release ptable.lock and then reacquire it
@@ -428,8 +427,8 @@ scheduler(void)
 
         p->acc = p->acc + p->priority_val;
 
-        PolicyCheckToRun(p);
-    }
+        PolicyCheckToRun(p, false);
+
     release(&ptable.lock);
 
   }
@@ -544,7 +543,7 @@ wakeup1(void *chan)
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
     if(p->state == SLEEPING && p->chan == chan){
       p->state = RUNNABLE;
-      PolicyCheckToRun(p);
+      PolicyCheckToRun(p, true);
     }
 }
 
@@ -572,7 +571,7 @@ kill(int pid)
       // Wake process from sleep if necessary.
       if(p->state == SLEEPING){
         p->state = RUNNABLE;
-        PolicyCheckToRun(p);
+        PolicyCheckToRun(p, true);
       }
       release(&ptable.lock);
       return 0;
@@ -622,13 +621,13 @@ procdump(void)
 int
 detach(int pid)
 {
-  struct proc *daddy_proc = myproc();
-  struct proc *daughter_proc;
+  struct proc *parent_proc = myproc();
+  struct proc *child_proc;
   acquire(&ptable.lock);
 
-  for(daughter_proc = ptable.proc; daughter_proc < &ptable.proc[NPROC]; daughter_proc++) {
-    if(daughter_proc->pid == pid && daughter_proc->parent == daddy_proc){
-      daughter_proc->parent = initproc;
+  for(child_proc = ptable.proc; child_proc < &ptable.proc[NPROC]; child_proc++) {
+    if(child_proc->pid == pid && child_proc->parent == parent_proc){
+        child_proc->parent = initproc;
       release(&ptable.lock);
       return 0;
     }
@@ -638,7 +637,7 @@ detach(int pid)
 }
 
 void
-PolicyCheckToRun(struct proc *p)
+PolicyCheckToRun(struct proc *p, boolean resetAcc)
 {  
   rpholder.remove(p);
   
@@ -647,11 +646,12 @@ PolicyCheckToRun(struct proc *p)
     return;
   }
   long long minAcc;
-  if (pq.getMinAccumulator(&minAcc))  // return true iff the queue isnt empty
-    p->acc = minAcc;
+    if (resetAcc) {
+        if (pq.getMinAccumulator(&minAcc))  // return true iff the queue isnt empty
+            p->acc = minAcc;
 
-  else p->acc = 0;
-  
+        else p->acc = 0;
+    }
   pq.put(p);
 }
 
