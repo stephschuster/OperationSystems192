@@ -10,8 +10,9 @@
 
 int policy_flag = 1;
 
-extern PriorityQueue pq;    //task3.2+3.3
-extern RoundRobinQueue rrq; //task 3.1
+extern long long __moddi3(long long, long long);
+extern PriorityQueue pq;
+extern RoundRobinQueue rrq;
 extern RunningProcessesHolder rpholder;
 
 long long getAccumulator(struct proc *p) {
@@ -122,10 +123,7 @@ found:
   p->context = (struct context*)sp;
   memset(p->context, 0, sizeof *p->context);
   p->context->eip = (uint)forkret;
-
   p->priority_val = 5;
-
-  
 
   return p;
 }
@@ -164,7 +162,7 @@ userinit(void)
   acquire(&ptable.lock);
 
   p->state = RUNNABLE;
-  PolicyCheck(p);
+  PolicyCheckToRun(p);
 
   release(&ptable.lock);
 }
@@ -231,7 +229,7 @@ fork(void)
   acquire(&ptable.lock);
 
   np->state = RUNNABLE;
-  PolicyCheck(np);
+  PolicyCheckToRun(np);
 
   release(&ptable.lock);
 
@@ -334,6 +332,54 @@ wait(int *status)
   }
 }
 
+struct proc* getByTimeQuantum(void){
+    if(__moddi3(ticks, 100) == 0) {
+        long long min = myproc()->ticks;
+        struct proc *minimum = 0;
+        struct proc *proc;
+        for(proc = ptable.proc; proc < &ptable.proc[NPROC]; proc++){
+            if(proc->state == RUNNABLE && proc->ticks < min) {
+                min = proc->ticks;
+                minimum = proc;
+            }
+        }
+        pq.extractProc(minimum);
+        return minimum;
+    }
+    return pq.extractMin();
+}
+
+struct proc* getProcessFromPolicy(void) {
+    struct proc *p;
+
+    if(policy_flag == 1) {
+        p = rrq.dequeue();
+    }
+    else if(policy_flag == 2) {
+        p = pq.extractMin();
+    }
+    else {
+        p = getByTimeQuantum();
+    }
+    p->ticks = ticks;
+    return p;
+}
+
+void setZeroPrioToOne(void){
+    struct proc *p;
+
+    for(p = ptable.proc ; p < &ptable.proc[NPROC]; p++)
+        if(p->priority_val == 0)
+            p->priority_val = 1;
+}
+
+void setAllAccToZero(void){
+    struct proc *p;
+
+    for(p = ptable.proc ; p < &ptable.proc[NPROC]; p++)
+        p->acc = 0;
+}
+
 //PAGEBREAK: 42
 // Per-CPU process scheduler.
 // Each CPU calls scheduler() after setting itself up.
@@ -356,27 +402,33 @@ scheduler(void)
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->state != RUNNABLE)
-        continue;
+        // check if the queue is empty
+        if ((policy_flag == 1 && rrq.isEmpty()) || (policy_flag != 1 && pq.isEmpty())) {
+            release(&ptable.lock);
+            continue;
+        }
 
-      // Switch to chosen process.  It is the process's job
-      // to release ptable.lock and then reacquire it
-      // before jumping back to us.
-      c->proc = p;
-      switchuvm(p);
-      p->state = RUNNING;
-      rpholder.add(p);
+        if(p->state != RUNNABLE)
+            continue;
+        p = getProcessFromPolicy();
+        // Switch to chosen process.  It is the process's job
+        // to release ptable.lock and then reacquire it
+        // before jumping back to us.
+        c->proc = p;
+        switchuvm(p);
+        p->state = RUNNING;
+        rpholder.add(p);
 
-      swtch(&(c->scheduler), p->context);
-      switchkvm();
+        swtch(&(c->scheduler), p->context);
+        switchkvm();
 
-      // Process is done running for now.
-      // It should have changed its p->state before coming back.
-      c->proc = 0;
+        // Process is done running for now.
+        // It should have changed its p->state before coming back.
+        c->proc = 0;
 
-      p->acc = p->acc + p->priority_val;
-      
-      PolicyCheck(p);
+        p->acc = p->acc + p->priority_val;
+
+        PolicyCheckToRun(p);
     }
     release(&ptable.lock);
 
@@ -414,8 +466,10 @@ void
 yield(void)
 {
   acquire(&ptable.lock);  //DOC: yieldlock
-  myproc()->state = RUNNABLE;
-  sched();
+    if(myproc() != 0) {
+        myproc()->state = RUNNABLE;
+        sched();
+    }
   release(&ptable.lock);
 }
 
@@ -490,7 +544,7 @@ wakeup1(void *chan)
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
     if(p->state == SLEEPING && p->chan == chan){
       p->state = RUNNABLE;
-      PolicyCheck(p);
+      PolicyCheckToRun(p);
     }
 }
 
@@ -518,7 +572,7 @@ kill(int pid)
       // Wake process from sleep if necessary.
       if(p->state == SLEEPING){
         p->state = RUNNABLE;
-        PolicyCheck(p);
+        PolicyCheckToRun(p);
       }
       release(&ptable.lock);
       return 0;
@@ -584,7 +638,7 @@ detach(int pid)
 }
 
 void
-PolicyCheck(struct proc *p)
+PolicyCheckToRun(struct proc *p)
 {  
   rpholder.remove(p);
   
@@ -605,12 +659,33 @@ PolicyCheck(struct proc *p)
 void
 policy (int policy_id)
 {
-  acquire(&ptable.lock);
+    acquire(&ptable.lock);
+    boolean succeed = true;
+    if (policy_flag == 1 && policy_id == 2) {
+        setZeroPrioToOne();
+        succeed = rrq.switchToPriorityQueuePolicy();
+        cprintf("policy change from 1 to 2. Nothing happens");
+    } else if (policy_flag == 1 && policy_id == 3) {
+        succeed = rrq.switchToPriorityQueuePolicy();
+        cprintf("policy change from 1 to 3. Nothing happens");
+    } else if (policy_flag == 2 && policy_id == 3) {
+        cprintf("policy change from 2 to 3. Nothing happens");
+    } else if (policy_flag == 3 && policy_id == 2) {
+        setZeroPrioToOne();
+        cprintf("policy change from 3 to 2. Nothing happens");
+    } else if ((policy_flag == 2 || policy_flag == 3) && policy_id == 1) {
+        succeed = pq.switchToRoundRobinPolicy();
+        setAllAccToZero();
+        cprintf("policy change from 2 or 3 to 1. Nothing happens");
+    }
 
-  policy_flag = policy_id;
-  // TODO
-
-  release(&ptable.lock); 
+    if (succeed) {
+        policy_flag = policy_id;
+    } else {
+        release(&ptable.lock);
+        panic("policy change failed!");
+    }
+    release(&ptable.lock);
 }
 
 void
@@ -619,7 +694,9 @@ priority(int newPriority)
   acquire(&ptable.lock);
 
   struct proc *curproc = myproc();
-  curproc->priority_val = newPriority;
+    if (curproc != 0) {
+        curproc->priority_val = newPriority;
+    }
 
   release(&ptable.lock);
 }
