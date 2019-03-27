@@ -30,7 +30,7 @@ OBJS = \
 	vm.o\
 
 # To compile and run on mac OS uncumment the following line.
-# TOOLPREFIX = i386-elf-
+TOOLPREFIX = i386-elf-
 
 # Using native tools (e.g., on X86 Linux)
 #TOOLPREFIX = 
@@ -203,6 +203,7 @@ UPROGS=\
 	_wc\
 	_zombie\
     _policy\
+    _test\
 
 fs.img: mkfs README $(UPROGS)
 	./mkfs fs.img README $(UPROGS)
@@ -272,7 +273,7 @@ qemu-nox-gdb: fs.img xv6.img .gdbinit
 EXTRA=\
 	mkfs.c ulib.c user.h sanity.c cat.c echo.c forktest.c grep.c kill.c policy.c\
 	ln.c ls.c mkdir.c rm.c stressfs.c usertests.c wc.c zombie.c\
-	printf.c umalloc.c\
+	printf.c umalloc.c test.c\
 	README dot-bochsrc *.pl toc.* runoff runoff1 runoff.list\
 	.gdbinit.tmpl gdbutil\
 

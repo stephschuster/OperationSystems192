@@ -6,6 +6,7 @@
 #include "memlayout.h"
 #include "mmu.h"
 #include "proc.h"
+#include "perf.h"
 
 int
 sys_fork(void)
@@ -126,4 +127,14 @@ sys_policy(void)
   if(poli > 3 || poli < 1)
     return;
   else policy(poli);
+}
+
+int
+sys_wait_stat(void){
+  char *status,*performance;
+  if(argptr(0, &status, 4) < 0)
+    return -1;
+  if(argptr(1, &performance, sizeof(struct perf)) < 0)
+    return -1;
+  return wait_stat((int*)(status), (struct perf*)(performance));
 }

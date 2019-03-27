@@ -32,6 +32,6 @@ main(void)
       exit(0);
     }
     while((wpid=wait(0)) >= 0 && wpid != pid)
-      printf(1, "zombie!\n"); //TODO: check if OK
+      printf(1, "zombie!\n");
   }
 }
