@@ -60,7 +60,9 @@ struct proc {
     int stime;                     // total time spent in the SLEEPING state
     int retime;                    // total time spent in the READY state
     int rutime;                    // total time spent in the RUNNING state
-    long long totalTime;
+    long long readyTime;
+    long long sleepTime;
+    long long runningTime;
 };
 
 // Process memory is laid out contiguously, low addresses first:

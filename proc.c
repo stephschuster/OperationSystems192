@@ -126,10 +126,10 @@ allocproc(void) {
     p->priority_val = 5;
     p->ticks = 2;
     p->ctime = ticks;
-    p->stime = 8;
+    p->stime = 0;
     p->retime = 0;
-    p->rutime = 7;
-    p->totalTime = 0;
+    p->rutime = 0;
+    p->readyTime = 0;
 
     return p;
 }
@@ -232,6 +232,7 @@ fork(void) {
     acquire(&ptable.lock);
 
     np->state = RUNNABLE;
+    np->readyTime = ticks;
     PolicyCheckToRun(np, true);
 
     release(&ptable.lock);
@@ -283,6 +284,8 @@ exit(int status) {
 
     // Jump into the scheduler, never to return.
     curproc->ttime = ticks;
+    if(curproc->state == RUNNING)
+        curproc->rutime += ticks - curproc->runningTime;
     curproc->state = ZOMBIE;
     sched();
     panic("zombie exit");
@@ -349,7 +352,6 @@ wait(int* status) {
 
 int
 wait_stat(int* status, struct perf* performance){
-    cprintf("status %d stime %d\n", *status,performance->stime);
     int childPid = wait1(status, performance);
     return childPid;
 }
@@ -384,7 +386,6 @@ struct proc* getProcessFromPolicy(void) {
         p = getByTimeQuantum();
     }
     p->ticks = ticks;
-    p->retime += (ticks - p->totalTime);
     return p;
 }
 
@@ -428,14 +429,17 @@ scheduler(void) {
             release(&ptable.lock);
             continue;
         }
-
+        
         p = getProcessFromPolicy();
+
         // Switch to chosen process.  It is the process's job
         // to release ptable.lock and then reacquire it
         // before jumping back to us.
         c->proc = p;
         switchuvm(p);
         p->state = RUNNING;
+        p->retime += ticks - p->readyTime;
+        p->runningTime = ticks;
         rpholder.add(p);
 
         swtch(&(c->scheduler), p->context);
@@ -485,7 +489,8 @@ yield(void) {
     acquire(&ptable.lock);  //DOC: yieldlock
     if (myproc() != 0) {
         myproc()->state = RUNNABLE;
-        myproc()->rutime++;
+        myproc()->rutime += ticks - myproc()->runningTime;
+        myproc()->readyTime = ticks;
         sched();
         PolicyCheckToRun(myproc(), false);
     }
@@ -536,8 +541,9 @@ sleep(void *chan, struct spinlock *lk) {
     }
     // Go to sleep.
     p->chan = chan;
+    p->rutime += ticks - p->runningTime;
     p->state = SLEEPING;
-    p->stime++;
+    p->sleepTime = ticks;
 
     sched();
 
@@ -561,6 +567,8 @@ wakeup1(void *chan) {
     for (p = ptable.proc; p < &ptable.proc[NPROC]; p++)
         if (p->state == SLEEPING && p->chan == chan) {
             p->state = RUNNABLE;
+            p->stime += ticks - p->sleepTime;
+            p->readyTime = ticks;
             PolicyCheckToRun(p, true);
         }
 }
@@ -587,6 +595,8 @@ kill(int pid) {
             // Wake process from sleep if necessary.
             if (p->state == SLEEPING) {
                 p->state = RUNNABLE;
+                p->stime += ticks - p->sleepTime;
+                p->readyTime = ticks;
                 PolicyCheckToRun(p, true);
             }
             release(&ptable.lock);
@@ -655,7 +665,6 @@ PolicyCheckToRun(struct proc *p, boolean resetAcc) {
     if (p->state != RUNNABLE) {
         return;
     }
-
     rpholder.remove(p);
 
     if (policy_flag == 1) {
@@ -671,9 +680,7 @@ PolicyCheckToRun(struct proc *p, boolean resetAcc) {
             p->acc = 0;
         }
     }
-
     pq.put(p);
-    p->totalTime=ticks;
 }
 
 void
