@@ -9,8 +9,6 @@
 #include "spinlock.h"
 #include "perf.h"
 
-#define MAX_LLONG 9223372036854775807
-
 int policy_flag = 1;
 
 extern long long __moddi3(long long, long long);
@@ -356,11 +354,11 @@ wait_stat(int* status, struct perf* performance){
 
 struct proc* getByTimeQuantum(void) {
     if (__moddi3(ticks, 100) == 0) {
-        long long min = MAX_LLONG;
+        long long min = 0;
         struct proc *minimum = myproc();
         struct proc *proc;
         for (proc = ptable.proc; proc < &ptable.proc[NPROC]; proc++) {
-            if (proc->state == RUNNABLE && proc->ticks < min) {
+            if (proc->state == RUNNABLE && proc->ticks >= min) {
                 min = proc->ticks;
                 minimum = proc;
             }
