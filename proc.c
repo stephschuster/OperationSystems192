@@ -9,6 +9,8 @@
 #include "spinlock.h"
 #include "perf.h"
 
+#define MAX_LLONG 9223372036854775807 // in order to find the process with the minimum ticks
+
 int policy_flag = 1;
 
 extern long long __moddi3(long long, long long);
@@ -354,11 +356,11 @@ wait_stat(int* status, struct perf* performance){
 
 struct proc* getByTimeQuantum(void) {
     if (__moddi3(ticks, 100) == 0) {
-        long long min = 0;
+        long long min = MAX_LLONG;
         struct proc *minimum = myproc();
         struct proc *proc;
         for (proc = ptable.proc; proc < &ptable.proc[NPROC]; proc++) {
-            if (proc->state == RUNNABLE && proc->ticks >= min) {
+            if (proc->state == RUNNABLE && proc->ticks < min) {
                 min = proc->ticks;
                 minimum = proc;
             }
@@ -681,19 +683,14 @@ policy (int policy_id) {
     if (policy_flag == 1 && policy_id == 2) {
         setZeroPrioToOne();
         succeed = rrq.switchToPriorityQueuePolicy();
-        cprintf("policy change from 1 to 2.\n");
     } else if (policy_flag == 1 && policy_id == 3) {
         succeed = rrq.switchToPriorityQueuePolicy();
-        cprintf("policy change from 1 to 3. \n");
     } else if (policy_flag == 2 && policy_id == 3) {
-        cprintf("policy change from 2 to 3. Nothing happens \n");
     } else if (policy_flag == 3 && policy_id == 2) {
         setZeroPrioToOne();
-        cprintf("policy change from 3 to 2. \n");
     } else if ((policy_flag == 2 || policy_flag == 3) && policy_id == 1) {
         succeed = pq.switchToRoundRobinPolicy();
         setAllAccToZero();
-        cprintf("policy change from 2 or 3 to 1. \n");
     }
 
     if (succeed) {

@@ -56,7 +56,7 @@ struct proc {
     long long ticks;               // process ticks
     int priority_val;              // process current priority
     int ctime;                     // creation time.
-    int ttime;                     // termination time.
+    int ttime;                     // termination time
     int stime;                     // total time spent in the SLEEPING state
     int retime;                    // total time spent in the READY state
     int rutime;                    // total time spent in the RUNNING state
