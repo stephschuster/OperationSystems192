@@ -6,6 +6,7 @@
 #include "memlayout.h"
 #include "mmu.h"
 #include "proc.h"
+#include "perf.h"
 
 int
 sys_fork(void)
@@ -14,16 +15,24 @@ sys_fork(void)
 }
 
 int
-sys_exit(void)
+sys_exit(int status)
 {
-  exit();
+  int exit_status;
+
+  if(argint(0, &exit_status) < 0)
+    return -1;
+
+  exit(exit_status);
   return 0;  // not reached
 }
 
 int
 sys_wait(void)
 {
-  return wait();
+  char *status;
+  if(argptr(0, &status, 4) < 0)
+    return -1;
+  return wait((int*)status);
 }
 
 int
@@ -88,4 +97,44 @@ sys_uptime(void)
   xticks = ticks;
   release(&tickslock);
   return xticks;
+}
+
+int
+sys_detach(void)
+{
+  int pid;
+
+  if(argint(0, &pid) < 0)
+    return -1;
+  return detach(pid);
+}
+
+void
+sys_priority(void)
+{
+  int prior;
+  argint(0,&prior);
+  if(prior > 10 || prior < 0)
+    return;
+  else priority(prior);
+}
+
+void
+sys_policy(void)
+{
+  int poli;
+  argint(0,&poli);
+  if(poli > 3 || poli < 1)
+    return;
+  else policy(poli);
+}
+
+int
+sys_wait_stat(void){
+  char *status,*performance;
+  if(argptr(0, &status, 4) < 0)
+    return -1;
+  if(argptr(1, &performance, sizeof(struct perf)) < 0)
+    return -1;
+  return wait_stat((int*)(status), (struct perf*)(performance));
 }

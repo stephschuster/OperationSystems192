@@ -3,6 +3,10 @@
 #include "types.h"
 #include "user.h"
 #include "fcntl.h"
+#include "stat.h"
+
+// path file
+#define PATH "/path"
 
 // Parsed command representation
 #define EXEC  1
@@ -52,6 +56,8 @@ struct backcmd {
 int fork1(void);  // Fork but panics on failure.
 void panic(char*);
 struct cmd *parsecmd(char*);
+int isFileExists(const char *path);
+int getFileLength(char* path);
 
 // Execute cmd.  Never returns.
 void
@@ -65,7 +71,7 @@ runcmd(struct cmd *cmd)
   struct redircmd *rcmd;
 
   if(cmd == 0)
-    exit();
+    exit(0);
 
   switch(cmd->type){
   default:
@@ -74,8 +80,35 @@ runcmd(struct cmd *cmd)
   case EXEC:
     ecmd = (struct execcmd*)cmd;
     if(ecmd->argv[0] == 0)
-      exit();
-    exec(ecmd->argv[0], ecmd->argv);
+      exit(0);
+
+    if (isFileExists(ecmd->argv[0])) {
+        exec(ecmd->argv[0], ecmd->argv);
+    } else {
+        int bufferLength = getFileLength(PATH);
+        int fd = open(PATH, O_RDONLY);
+        char *buffer = malloc(bufferLength);
+        read(fd, buffer, bufferLength);
+        close(fd);
+
+        char *start = buffer;
+        char *end, *path;
+        int cmdLength = strlen(ecmd->argv[0]);
+        while ((end = strchr(start, ':')) != 0) {
+            int pathLength = end - start;
+            path = malloc(cmdLength + pathLength);
+            for (int i = 0; start[i] != ':'; i++) {
+                path[i] = start[i];
+            }
+            for (int i = 0; i < cmdLength; i++) {
+                path[i + pathLength] = ecmd->argv[0][i];
+            }
+            if (isFileExists(path)) {
+                exec(path, ecmd->argv);
+            }
+            start = end + 1;
+        }
+    }
     printf(2, "exec %s failed\n", ecmd->argv[0]);
     break;
 
@@ -84,7 +117,7 @@ runcmd(struct cmd *cmd)
     close(rcmd->fd);
     if(open(rcmd->file, rcmd->mode) < 0){
       printf(2, "open %s failed\n", rcmd->file);
-      exit();
+      exit(0);
     }
     runcmd(rcmd->cmd);
     break;
@@ -93,7 +126,7 @@ runcmd(struct cmd *cmd)
     lcmd = (struct listcmd*)cmd;
     if(fork1() == 0)
       runcmd(lcmd->left);
-    wait();
+    wait(0);
     runcmd(lcmd->right);
     break;
 
@@ -117,8 +150,8 @@ runcmd(struct cmd *cmd)
     }
     close(p[0]);
     close(p[1]);
-    wait();
-    wait();
+    wait(0);
+    wait(0);
     break;
 
   case BACK:
@@ -127,7 +160,7 @@ runcmd(struct cmd *cmd)
       runcmd(bcmd->cmd);
     break;
   }
-  exit();
+  exit(0);
 }
 
 int
@@ -166,16 +199,16 @@ main(void)
     }
     if(fork1() == 0)
       runcmd(parsecmd(buf));
-    wait();
+    wait(0);
   }
-  exit();
+  exit(0);
 }
 
 void
 panic(char *s)
 {
   printf(2, "%s\n", s);
-  exit();
+  exit(0);
 }
 
 int
@@ -490,4 +523,28 @@ nulterminate(struct cmd *cmd)
     break;
   }
   return cmd;
+}
+
+int isFileExists(const char *filename) {
+    struct stat buffer;
+    int exist = stat(filename, &buffer);
+    if(exist != -1) {
+        return 1;
+    }
+    else { // -1
+        return 0;
+    }
+}
+
+int getFileLength(char* path) {
+    int fd = open(path, O_RDONLY), length = 0;
+    char c;
+    if (fd < 0) {
+        return -1;
+    }
+    while(read(fd, &c, 1) == 1) {
+        length++;
+    }
+    close(fd);
+    return length;
 }

@@ -38,19 +38,31 @@ enum procstate { UNUSED, EMBRYO, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 
 // Per-process state
 struct proc {
-  uint sz;                       // Size of process memory (bytes)
-  pde_t* pgdir;                  // Page table
-  char *kstack;                  // Bottom of kernel stack for this process
-  enum procstate volatile state; // Process state
-  int pid;                       // Process ID
-  struct proc *parent;           // Parent process
-  struct trapframe *tf;          // Trap frame for current syscall
-  struct context *context;       // swtch() here to run process
-  void *chan;                    // If non-zero, sleeping on chan
-  int killed;                    // If non-zero, have been killed
-  struct file *ofile[NOFILE];    // Open files
-  struct inode *cwd;             // Current directory  
-  char name[16];                 // Process name (debugging)
+    int status;                    // exit status
+    uint sz;                       // Size of process memory (bytes)
+    pde_t *pgdir;                  // Page table
+    char *kstack;                  // Bottom of kernel stack for this process
+    enum procstate volatile state; // Process state
+    int pid;                       // Process ID
+    struct proc *parent;           // Parent process
+    struct trapframe *tf;          // Trap frame for current syscall
+    struct context *context;       // swtch() here to run process
+    void *chan;                    // If non-zero, sleeping on chan
+    int killed;                    // If non-zero, have been killed
+    struct file *ofile[NOFILE];    // Open files
+    struct inode *cwd;             // Current directory
+    char name[16];                 // Process name (debugging)
+    long long acc;                 // accumulated value of the process
+    long long ticks;               // process ticks
+    int priority_val;              // process current priority
+    int ctime;                     // creation time.
+    int ttime;                     // termination time
+    int stime;                     // total time spent in the SLEEPING state
+    int retime;                    // total time spent in the READY state
+    int rutime;                    // total time spent in the RUNNING state
+    long long readyTime;
+    long long sleepTime;
+    long long runningTime;
 };
 
 // Process memory is laid out contiguously, low addresses first:
